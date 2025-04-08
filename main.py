@@ -41,96 +41,47 @@ def convert_numpy_types(obj):
         return [convert_numpy_types(item) for item in obj]
     return obj
 
-# Function to generate creative responses based on user input and context
-def generate_creative_response(user_message, context, step):
-    """Generate a creative response based on user message, context, and current step"""
+# Function to generate smart, concise responses based on user input
+def generate_concise_response(user_message, context, step):
+    """Generate a concise response based on user message and context"""
     # Analyze sentiment
     sentiment = sia.polarity_scores(user_message)
     sentiment_compound = sentiment['compound']
     
-    # Tokenize and preprocess
+    # Tokenize and get keywords
     tokens = word_tokenize(user_message.lower())
     tokens = [lemmatizer.lemmatize(token) for token in tokens if token.isalnum()]
     
-    # Different response styles based on sentiment and context 
-    thank_you_phrases = [
-        "Thank you for sharing that! I appreciate your insights.",
-        "That's really valuable information, thank you!",
-        "I appreciate your thoughtful response.",
-        "Thanks for letting me know about that!",
-        "That's great to hear, thank you for sharing."
-    ]
+    # Simple acknowledgment phrases based on sentiment
+    if sentiment_compound > 0.3:
+        response = "Great!"
+    elif sentiment_compound > 0:
+        response = "Thanks for sharing."
+    elif sentiment_compound > -0.3:
+        response = "I understand."
+    else:
+        response = "I appreciate your honesty."
     
-    follow_up_phrases = {
-        'general': [
-            "Let's dive a bit deeper into your background.",
-            "I'd like to understand more about your experiences.",
-            "Now, I'd like to explore another aspect of your profile.",
-            "That's interesting! Let's move on to another important question."
-        ],
-        'occupation': [
-            f"As a {context.get('selected_occupation', 'professional')}, I'd like to ask you something specific.",
-            "Based on your professional background, I'm curious about something.",
-            "Your experience is quite interesting! Here's something I'd like to know:",
-            "Given your career path, I'm particularly interested in learning about:"
-        ],
-        'job_role': [
-            f"With your interest in {context.get('selected_role', 'this field')}, I'd like to know:",
-            "Your expertise in this area brings up an important question:",
-            "Considering your specialization, I'm curious about:",
-            "For someone with your skills, this next question is particularly relevant:"
-        ],
-        'job_type': [
-            "Let's talk about your work preferences in more detail.",
-            "I'd like to understand your ideal work arrangement better.",
-            "Your work style preferences are important. Let me ask you about:",
-            "Now, let's explore what work structure suits you best."
-        ],
-        'job_mode': [
-            "Work environment matters a lot. Let's discuss that next.",
-            "Your preference for how you work is important to understand.",
-            "Let's explore your ideal working environment further.",
-            "Now, I'd like to know about where you prefer to work."
-        ],
-        'resume_upload': [
-            "Your resume will help me understand your full professional story.",
-            "I'd love to see your resume to learn more about your journey.",
-            "Your resume will provide valuable context to your answers.",
-            "To complete your profile, I'll need your resume."
-        ],
-        'complete': [
-            "Thank you for taking the time to complete this interview!",
-            "You've provided some fantastic insights throughout our conversation.",
-            "I've really enjoyed learning about your background and aspirations.",
-            "This has been a productive conversation! I appreciate your detailed responses."
-        ]
+    # Add context-specific brief responses
+    context_responses = {
+        'general': "Let's continue.",
+        'occupation': f"Good to know.",
+        'job_role': f"Excellent choice.",
+        'job_type': "Perfect.",
+        'job_mode': "Got it.",
+        'resume_upload': "Almost done!",
+        'complete': "Thanks for completing the interview!"
     }
     
-    # Select appropriate response templates based on sentiment
-    if sentiment_compound > 0.3:
-        thank_you = "Excellent! " + random.choice(thank_you_phrases)
-    elif sentiment_compound > 0:
-        thank_you = random.choice(thank_you_phrases)
-    elif sentiment_compound > -0.3:
-        thank_you = "I understand. Thanks for sharing your perspective."
-    else:
-        thank_you = "I appreciate you sharing that with me, even though it might be challenging."
-    
-    # Generate appropriate follow-up based on current step
-    if step in follow_up_phrases:
-        follow_up = random.choice(follow_up_phrases[step])
-    else:
-        follow_up = random.choice(follow_up_phrases['general'])
-    
-    # Special handling for specific contexts
+    # Look for keywords to personalize slightly
     if any(word in tokens for word in ['experience', 'worked', 'job', 'project']):
-        follow_up = "Your experience is valuable! " + follow_up
+        response = "Your experience is valuable."
+    elif any(word in tokens for word in ['learn', 'education', 'study']):
+        response = "Great background."
     
-    if any(word in tokens for word in ['learn', 'education', 'study', 'university', 'college']):
-        follow_up = "Your educational background provides great context. " + follow_up
-    
-    # Combine phrases for final response
-    response = f"{thank_you} {follow_up}"
+    # Add the context-specific part
+    if step in context_responses:
+        response = f"{response} {context_responses[step]}"
     
     return response
 
@@ -286,18 +237,18 @@ def get_message():
             general_questions = get_general_questions()
             
             if question_index < len(general_questions):
-                # Generate creative response based on user's previous message
+                # Generate concise response
                 if user_message:
-                    bot_response = generate_creative_response(user_message, session, current_step)
+                    bot_response = generate_concise_response(user_message, session, current_step)
                 else:
-                    bot_response = "Welcome to our interview chatbot! Let's get to know you better."
+                    bot_response = "Welcome! Let's begin."
                 
                 next_question = general_questions[question_index]
                 session['current_question'] = next_question
                 session['question_index'] = question_index + 1
             else:
-                # Move to occupation questions with a creative transition
-                bot_response = generate_creative_response(user_message, session, current_step) + "\n\nNow, I'd like to understand more about your career path."
+                # Move to occupation questions
+                bot_response = generate_concise_response(user_message, session, current_step)
                 next_question = "What is your current occupation status?"
                 is_options = True
                 options = ["Student", "Fresher", "Experienced Professional"]
@@ -320,19 +271,19 @@ def get_message():
                     session['occupation_questions'] = get_occupation_questions(selected_occupation)
                     
                     if session['occupation_questions']:
-                        # Generate personalized response based on occupation
+                        # Brief responses based on occupation
                         occupation_responses = {
-                            'Student': f"Great to meet a fellow student! Your academic perspective is valuable.",
-                            'Fresher': "Being a fresher brings a fresh perspective to the industry. I'm excited to learn more about your aspirations.",
-                            'Experienced Professional': "Your professional experience is impressive! I'd love to dive deeper into your expertise."
+                            'Student': "Great! Student perspective is valuable.",
+                            'Fresher': "Fresh talent is always welcome!",
+                            'Experienced Professional': "Your experience matters."
                         }
-                        bot_response = occupation_responses.get(selected_occupation, f"You selected: {selected_occupation}")
+                        bot_response = occupation_responses.get(selected_occupation, f"{selected_occupation} selected.")
                         next_question = session['occupation_questions'][0]
                         session['current_question'] = next_question
                         session['question_index'] = 1
                     else:
                         # No occupation questions, move to job roles
-                        bot_response = f"Thanks for letting me know you're a {selected_occupation}! Let's talk about your area of interest."
+                        bot_response = f"{selected_occupation} noted. Let's talk about your interests."
                         next_question = "Select a job role:"
                         is_options = True
                         options = ["UI/UX", "Java", "AI/ML"]
@@ -341,7 +292,7 @@ def get_message():
                         session['question_index'] = 0
                 else:
                     # Invalid input
-                    bot_response = "I didn't quite catch that. Could you please select one of the options below?"
+                    bot_response = "Please select a valid option."
                     next_question = "What is your current occupation status?"
                     is_options = True
                     options = ["Student", "Fresher", "Experienced Professional"]
@@ -358,13 +309,13 @@ def get_message():
                     
                     if question_index < len(occupation_questions):
                         # More occupation questions
-                        bot_response = generate_creative_response(user_message, session, current_step)
+                        bot_response = generate_concise_response(user_message, session, current_step)
                         next_question = occupation_questions[question_index]
                         session['current_question'] = next_question
                         session['question_index'] = question_index + 1
                     else:
                         # Move to job roles
-                        bot_response = generate_creative_response(user_message, session, current_step) + "\n\nNow, let's focus on your specific area of interest."
+                        bot_response = generate_concise_response(user_message, session, current_step)
                         next_question = "Select a job role:"
                         is_options = True
                         options = ["UI/UX", "Java", "AI/ML"]
@@ -393,21 +344,21 @@ def get_message():
                     # Get job role questions
                     session['job_role_questions'] = get_job_role_questions(selected_role)
                     
-                    # Personalized responses based on job role
+                    # Brief responses based on role
                     role_responses = {
-                        "UI/UX": "UI/UX is such a creative field! The intersection of design and user experience is fascinating.",
-                        "Java": "Java development is a powerful skill set. The demand for solid Java expertise continues to grow!",
-                        "AI/ML": "AI/ML is at the cutting edge of technology today. Your interest in this field shows forward thinking!"
+                        "UI/UX": "Great choice! UI/UX is in demand.",
+                        "Java": "Java skills are always valuable.",
+                        "AI/ML": "AI/ML is cutting-edge. Good pick!"
                     }
                     
                     if session['job_role_questions']:
-                        bot_response = role_responses.get(selected_role, f"You selected: {selected_role}")
+                        bot_response = role_responses.get(selected_role, f"{selected_role} noted.")
                         next_question = session['job_role_questions'][0]
                         session['current_question'] = next_question
                         session['question_index'] = 1
                     else:
                         # No job role questions, move to job type
-                        bot_response = role_responses.get(selected_role, f"You selected: {selected_role}") + "\n\nLet's talk about your employment preferences."
+                        bot_response = role_responses.get(selected_role, f"{selected_role} noted.")
                         next_question = "Select the type of job role:"
                         is_options = True
                         options = ["Full-time", "Part-time", "Freelancing"]
@@ -416,7 +367,7 @@ def get_message():
                         session['question_index'] = 0
                 else:
                     # Invalid input
-                    bot_response = "I didn't quite catch that. Could you please select one of the job roles below?"
+                    bot_response = "Please select a valid job role."
                     next_question = "Select a job role:"
                     is_options = True
                     options = ["UI/UX", "Java", "AI/ML"]
@@ -433,13 +384,13 @@ def get_message():
                     
                     if question_index < len(job_role_questions):
                         # More job role questions
-                        bot_response = generate_creative_response(user_message, session, current_step)
+                        bot_response = generate_concise_response(user_message, session, current_step)
                         next_question = job_role_questions[question_index]
                         session['current_question'] = next_question
                         session['question_index'] = question_index + 1
                     else:
                         # Move to job type
-                        bot_response = generate_creative_response(user_message, session, current_step) + "\n\nNow, let's discuss what kind of employment arrangement you're looking for."
+                        bot_response = generate_concise_response(user_message, session, current_step)
                         next_question = "Select the type of job role:"
                         is_options = True
                         options = ["Full-time", "Part-time", "Freelancing"]
@@ -463,15 +414,15 @@ def get_message():
                 session['responses']['job_type'] = selected_job_type
                 session['questions']['job_type'] = "Select the type of job role:"
                 
-                # Personalized responses based on job type
+                # Brief responses based on job type
                 type_responses = {
-                    "Full-time": "A full-time position offers stability and deep engagement with your team and projects.",
-                    "Part-time": "Part-time work provides excellent flexibility while still maintaining professional growth.",
-                    "Freelancing": "Freelancing gives you the freedom to choose diverse projects and manage your own schedule."
+                    "Full-time": "Full-time - solid choice.",
+                    "Part-time": "Part-time offers good flexibility.",
+                    "Freelancing": "Freelancing gives you independence."
                 }
                 
                 # Move to job mode
-                bot_response = type_responses.get(selected_job_type, f"You selected: {selected_job_type}") + "\n\nAnd where would you prefer to work?"
+                bot_response = type_responses.get(selected_job_type, f"{selected_job_type} noted.")
                 next_question = "Select your preferred job mode:"
                 is_options = True
                 options = ["Remote", "Onsite", "Hybrid"]
@@ -479,7 +430,7 @@ def get_message():
                 session['current_question'] = next_question
             else:
                 # Invalid input
-                bot_response = "I'm not sure I understood that choice. Please select one of the options below."
+                bot_response = "Please select a valid option."
                 next_question = "Select the type of job role:"
                 is_options = True
                 options = ["Full-time", "Part-time", "Freelancing"]
@@ -501,22 +452,22 @@ def get_message():
                 session['responses']['job_mode'] = selected_job_mode
                 session['questions']['job_mode'] = "Select your preferred job mode:"
                 
-                # Personalized responses based on job mode
+                # Brief responses based on job mode
                 mode_responses = {
-                    "Remote": "Remote work offers flexibility and comfort in your own environment. Many find it boosts productivity!",
-                    "Onsite": "Working onsite provides great collaboration opportunities and a clear separation between work and home.",
-                    "Hybrid": "The hybrid model gives you the best of both worlds - flexibility and in-person collaboration when needed."
+                    "Remote": "Remote work - good choice.",
+                    "Onsite": "Onsite offers great collaboration.",
+                    "Hybrid": "Hybrid gives you flexibility."
                 }
                 
                 # Move to resume upload
-                bot_response = mode_responses.get(selected_job_mode, f"You selected: {selected_job_mode}") + "\n\nWe're almost done! To complete your profile, I'll need your resume."
+                bot_response = mode_responses.get(selected_job_mode, f"{selected_job_mode} selected.")
                 next_question = "Please upload your resume (PDF, DOC, or DOCX format)."
                 session['current_step'] = 'resume_upload'
                 session['current_question'] = next_question
                 is_file_upload = True
             else:
                 # Invalid input
-                bot_response = "I didn't quite catch that. Please select one of the work modes below."
+                bot_response = "Please select a valid option."
                 next_question = "Select your preferred job mode:"
                 is_options = True
                 options = ["Remote", "Onsite", "Hybrid"]
@@ -525,7 +476,7 @@ def get_message():
         elif current_step == 'resume_upload':
             if session.get('resume_uploaded', False):
                 # Resume already uploaded, complete the interview
-                bot_response = "Amazing! Thank you for taking the time to complete this interview. Your responses and resume provide valuable insights into your background and aspirations. We'll review your information carefully!"
+                bot_response = "Thanks for completing the interview! Your responses have been recorded."
                 next_question = "Would you like to start another interview?"
                 is_options = True
                 options = ["Yes", "No"]
@@ -553,7 +504,7 @@ def get_message():
                 save_interview_data(data)
             else:
                 # Waiting for resume upload
-                bot_response = "I'm looking forward to seeing your resume! Please use the file upload button to share it with me (PDF, DOC, or DOCX format)."
+                bot_response = "Please upload your resume to continue."
                 next_question = "Please upload your resume (PDF, DOC, or DOCX format)."
                 is_file_upload = True
         
@@ -572,15 +523,15 @@ def get_message():
                 
                 general_questions = get_general_questions()
                 if general_questions:
-                    bot_response = "Great! I'm excited to start a new interview with you. Let's begin with getting to know you better."
+                    bot_response = "Starting a new interview."
                     next_question = general_questions[0]
                     session['current_question'] = next_question
                     session['question_index'] = 1
                 else:
-                    bot_response = "I'm sorry, but I'm having trouble accessing the questions right now. Please try again later or contact support."
+                    bot_response = "Sorry, questions couldn't be loaded. Please try again later."
             else:
                 # End the chat
-                bot_response = "Thank you for using our interview chatbot today! It was a pleasure getting to know you. I wish you the best of luck in your career journey! Feel free to return whenever you'd like to start another interview."
+                bot_response = "Thank you for using our interview chatbot. Have a great day!"
                 next_question = ""
         
         # Update chat history
@@ -611,8 +562,8 @@ def get_message():
         print(f"Error in get_message: {e}")
         # Return a friendly error message
         return jsonify({
-            "bot_response": "I'm sorry, I encountered an issue processing your request. Let's try again.",
-            "next_question": "Could you please repeat your last message?",
+            "bot_response": "Something went wrong. Let's try again.",
+            "next_question": "Please retry.",
             "is_options": False,
             "options": [],
             "is_file_upload": False
@@ -627,7 +578,7 @@ def upload_resume():
         
         file = request.files['resume']
         
-        # If the user does not select a file, the browser submits an empty file without a filename
+        # If user does not select a file
         if file.filename == '':
             return jsonify({"success": False, "message": "No selected file"})
         
@@ -648,10 +599,10 @@ def upload_resume():
                 "filename": filename
             })
         
-        return jsonify({"success": False, "message": "File type not allowed. Please upload PDF, DOC, or DOCX file."})
+        return jsonify({"success": False, "message": "File type not allowed. Use PDF, DOC, or DOCX."})
     except Exception as e:
         print(f"Error in upload_resume: {e}")
-        return jsonify({"success": False, "message": "An error occurred while uploading your resume. Please try again."})
+        return jsonify({"success": False, "message": "Upload failed. Please try again."})
 
 @app.route('/get_history')
 def get_history():
@@ -662,7 +613,7 @@ def get_history():
         return jsonify({"chat_history": chat_history})
     except Exception as e:
         print(f"Error in get_history: {e}")
-        return jsonify({"chat_history": [], "error": "Failed to retrieve chat history"})
+        return jsonify({"chat_history": [], "error": "Failed to get chat history"})
 
 @app.route('/download/<filename>')
 def download_file(filename):
